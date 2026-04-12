@@ -95,7 +95,9 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout'
+            node('') {
+                sh 'docker logout || true'
+            }
         }
         success {
             echo "Pipeline succeeded! Images pushed:"
@@ -106,10 +108,12 @@ pipeline {
             echo "Pipeline failed at stage: ${env.STAGE_NAME}"
         }
         cleanup {
-            sh '''
-                docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
-                docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} || true
-            '''
+            node('') {
+                sh '''
+                    docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
+                    docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} || true
+                '''
+            }
         }
     }
 }
