@@ -1,6 +1,8 @@
 services:
   backend:
     build:
+      tags:
+        - ims_backend
       context: ./Backend
       dockerfile: Dockerfile
     ports:
@@ -10,6 +12,8 @@ services:
 
   frontend:
     build:
+      tags:
+        - ims_frontend
       context: ./Frontend
       dockerfile: dockerfile.dev
     ports:
