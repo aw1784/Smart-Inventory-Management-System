@@ -62,17 +62,6 @@ pipeline {
             }
         }
 
-        stage('Deploy') {
-            steps {
-                dir("${APP_DIR}") {
-                    sh '''
-                        docker compose down --remove-orphans
-                        IMAGE_TAG=${IMAGE_TAG} docker compose up -d
-                    '''
-                }
-            }
-        }
-
     }
 
     post {
