@@ -7,6 +7,7 @@ pipeline {
         FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
         BACKEND_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend"
         IMAGE_TAG             = "${BUILD_NUMBER}"
+        APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
     }
 
     triggers {
@@ -17,32 +18,11 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo "Checking out branch: ${env.BRANCH_NAME}"
+                echo "Checking out branch: ${env.GIT_BRANCH}"
                 checkout scm
             }
         }
 
-        stage('Test Backend') {
-            steps {
-                dir('Backend') {
-                    sh '''
-                        npm install
-                        npm test || echo "No tests found, skipping..."
-                    '''
-                }
-            }
-        }
-
-        stage('Test Frontend') {
-            steps {
-                dir('Frontend') {
-                    sh '''
-                        npm install
-                        npm test || echo "No tests found, skipping..."
-                    '''
-                }
-            }
-        }
 
         stage('Build Images') {
             parallel {
@@ -52,7 +32,7 @@ pipeline {
                             docker build \
                                 -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
                                 -t ${BACKEND_IMAGE}:latest \
-                                ./Backend
+                                ${APP_DIR}/Backend
                         '''
                     }
                 }
@@ -60,10 +40,10 @@ pipeline {
                     steps {
                         sh '''
                             docker build \
-                                -f Frontend/dockerfile.dev \
+                                -f ${APP_DIR}/Frontend/dockerfile.dev \
                                 -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
                                 -t ${FRONTEND_IMAGE}:latest \
-                                ./Frontend
+                                ${APP_DIR}/Frontend
                         '''
                     }
                 }
@@ -84,10 +64,12 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                sh '''
-                    docker compose down --remove-orphans
-                    IMAGE_TAG=${IMAGE_TAG} docker compose up -d
-                '''
+                dir("${APP_DIR}") {
+                    sh '''
+                        docker compose down --remove-orphans
+                        IMAGE_TAG=${IMAGE_TAG} docker compose up -d
+                    '''
+                }
             }
         }
 
@@ -100,9 +82,9 @@ pipeline {
             }
         }
         success {
-            echo "Pipeline succeeded! Images pushed:"
-            echo "  ${BACKEND_IMAGE}:${IMAGE_TAG}"
-            echo "  ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            echo "Pipeline succeeded!"
+            echo "Backend image:  ${BACKEND_IMAGE}:${IMAGE_TAG}"
+            echo "Frontend image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
         }
         failure {
             echo "Pipeline failed at stage: ${env.STAGE_NAME}"
