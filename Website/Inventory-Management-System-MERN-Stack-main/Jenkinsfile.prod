@@ -1,0 +1,90 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+        DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
+        FRONTEND_IMAGE_PROD   = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend-prod"
+        BACKEND_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend"
+        IMAGE_TAG             = "${BUILD_NUMBER}"
+        APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
+    }
+
+    triggers {
+        githubPush()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                echo "Checking out branch: ${env.GIT_BRANCH}"
+                checkout scm
+            }
+        }
+
+
+        stage('Build Images') {
+            parallel {
+                stage('Build Backend Image') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
+                                -t ${BACKEND_IMAGE}:latest \
+                                ${APP_DIR}/Backend
+                        '''
+                    }
+                }
+                stage('Build Frontend Image for Production') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -f ${APP_DIR}/Frontend/dockerfile.prod \
+                                -t ${FRONTEND_IMAGE_PROD}:${IMAGE_TAG} \
+                                -t ${FRONTEND_IMAGE_PROD}:latest \
+                                ${APP_DIR}/Frontend
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
+                sh '''
+                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
+                    docker push ${BACKEND_IMAGE}:latest
+                    docker push ${FRONTEND_IMAGE_PROD}:${IMAGE_TAG}
+                    docker push ${FRONTEND_IMAGE_PROD}:latest
+                '''
+            }
+        }
+
+    }
+
+    post {
+        always {
+            node('') {
+                sh 'docker logout || true'
+            }
+        }
+        success {
+            echo "Pipeline succeeded!"
+            echo "Backend image:  ${BACKEND_IMAGE}:${IMAGE_TAG}"
+            echo "Frontend image: ${FRONTEND_IMAGE_PROD}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "Pipeline failed at stage: ${env.STAGE_NAME}"
+        }
+        cleanup {
+            node('') {
+                sh '''
+                    docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
+                    docker rmi ${FRONTEND_IMAGE_PROD}:${IMAGE_TAG} || true
+                '''
+            }
+        }
+    }
+}
