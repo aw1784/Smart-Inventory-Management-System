@@ -1,0 +1,131 @@
+---
+- name: Setup Docker, Jenkins, Ngrok and Project Structure
+  hosts: all
+  become: yes
+  vars:
+   
+    project_dir: "/opt/TEST"
+
+  tasks:
+    - name: Update apt cache and install basic dependencies
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - gnupg
+          - unzip
+          - openjdk-21-jre 
+        state: present
+        update_cache: yes
+
+    # ==========================================
+    # 1. Docker Setup
+    # ==========================================
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        state: present
+
+    - name: Install Docker components
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Ensure Docker service is started and enabled
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    # ==========================================
+    # 2. Jenkins Setup
+    # ==========================================
+    - name: Add Jenkins GPG key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
+
+    - name: Add Jenkins APT repository
+      apt_repository:
+        repo: deb https://pkg.jenkins.io/debian-stable binary/
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Ensure Jenkins service is started and enabled
+      service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    # ==========================================
+    # 3. Ngrok Setup
+    # ==========================================
+    - name: Download Ngrok archive
+      get_url:
+        url: https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+        dest: /tmp/ngrok.tgz
+
+    - name: Extract Ngrok to /usr/local/bin
+      unarchive:
+        src: /tmp/ngrok.tgz
+        dest: /usr/local/bin
+        remote_src: yes
+
+    - name: Set executable permissions for Ngrok
+      file:
+        path: /usr/local/bin/ngrok
+        mode: '0755'
+
+    # ==========================================
+    # 4. Project Folder Structure
+    # ==========================================
+    - name: Create the main project directory
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create Backend and Frontend directories
+      file:
+        path: "{{ project_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - Backend
+        - Frontend
+
+    - name: Create .env files inside Backend and Frontend
+      copy:
+        content: "# Environment variables for {{ item }}\n"
+        dest: "{{ project_dir }}/{{ item }}/.env"
+        mode: '0644'
+        force: no 
+      loop:
+        - Backend
+        - Frontend
+
+    - name: Create docker-compose.prod.yml file
+      copy:
+        content: |
+          version: '3.8'
+          # Add your production services configuration here
+        dest: "{{ project_dir }}/docker-compose.prod.yml"
+        mode: '0644'
+        force: no
