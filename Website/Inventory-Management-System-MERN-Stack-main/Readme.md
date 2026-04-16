@@ -11,7 +11,8 @@ An Inventory Management System built with Vite, React.js for the frontend, and N
   - [Environment Setup](#environment-setup)
   - [Option 1: Pull from Docker Hub (Fastest)](#option-1-pull-from-docker-hub-fastest)
   - [Option 2: Run with Docker Compose (Recommended)](#option-2-run-with-docker-compose-recommended)
-  - [Option 3: Run Manually](#option-3-run-manually)
+  - [Option 3: Deploy with Kubernetes](#option-3-deploy-with-kubernetes)
+  - [Option 4: Run Manually](#option-4-run-manually)
 - [CI/CD Pipeline (Jenkins)](#cicd-pipeline-jenkins)
 - [Environment Variables](#environment-variables)
 - [API Endpoints](#api-endpoints)
@@ -66,6 +67,7 @@ Inventory-Management-System-MERN-Stack-main/
 │       └── user_utils.js
 ├── Frontend
 │   ├── README.md
+│   ├── Dockerfile
 │   ├── dockerfile.dev
 │   ├── .env
 │   ├── index.html
@@ -99,6 +101,22 @@ Inventory-Management-System-MERN-Stack-main/
 │   │       └── users/
 │   ├── tailwind.config.js
 │   └── vite.config.js
+├── k8s
+│   ├── K8s_run.sh
+│   ├── K8s_Stop.sh
+│   ├── README.md
+│   ├── backend
+│   │   ├── configmap.yaml
+│   │   ├── deployment.yaml
+│   │   ├── namespace.yaml
+│   │   ├── secret.yaml
+│   │   └── service.yaml
+│   ├── frontend
+│   │   ├── deployment.yaml
+│   │   └── service.yaml
+│   ├── ingress.yaml
+│   ├── port-forward-backend.sh
+│   └── port-forward-frontend.sh
 ├── Jenkinsfile
 ├── Readme.md
 └── docker-compose.yml
@@ -110,6 +128,11 @@ Inventory-Management-System-MERN-Stack-main/
 
 ### For Docker (Recommended)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- A [MongoDB Atlas](https://mongodb.com/atlas) account (free tier)
+
+### For Kubernetes
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
+- A running Kubernetes cluster (e.g. [Minikube](https://minikube.sigs.k8s.io/docs/start/) or Docker Desktop with Kubernetes enabled)
 - A [MongoDB Atlas](https://mongodb.com/atlas) account (free tier)
 
 ### For CI/CD Pipeline
@@ -125,47 +148,44 @@ Inventory-Management-System-MERN-Stack-main/
 ---
 
 ## Installation
+
 ### Environment Setup (do this ONCE, applies to all options)
 
-1. **Set up MongoDB Atlas:**
-   - Visit [MongoDB Atlas](https://mongodb.com/atlas) and create a free account.
-   - Create a new project and deploy a free M0 cluster.
-   - In **Database Access**, add a database user with a strong password (include letters, numbers, and symbols for security).
-   - In **Network Access**, add IP address `0.0.0.0/0` to allow access from anywhere (for development only; restrict in production).
-   - In **Clusters**, click **Connect**, select **Connect your application**, and copy the connection string. Replace `<username>` and `<password>` with your database user credentials.
+**1. Set up MongoDB Atlas:**
+- Visit [MongoDB Atlas](https://mongodb.com/atlas) and create a free account
+- Create a new project and deploy a free M0 cluster
+- In **Database Access**, add a database user with a simple password (letters and numbers only)
+- In **Network Access**, add IP address `0.0.0.0/0` to allow access from anywhere
+- In **Clusters**, click **Connect → Connect your application** and copy the connection string
 
-2. **Create environment files:**
+**2. Create environment files:**
 
-   Create the following files in their respective directories:
+`Backend/.env`:
+```env
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/ims?retryWrites=true&w=majority&appName=Cluster0
+PORT=3000
+SECRET_KEY=your_secret_key_here
+NODE_ENV=development
+ORIGIN=http://localhost:5173
+```
 
-   `Backend/.env`:
-   ```env
-   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/ims?retryWrites=true&w=majority&appName=Cluster0
-   PORT=3000
-   SECRET_KEY=your_secret_key_here  # Generate a strong, random secret key
-   NODE_ENV=development
-   ORIGIN=http://localhost:5173
-   ```
+`Frontend/.env`:
+```env
+VITE_SERVER=https://inventory-management-backend-hsaf.onrender.com
+VITE_MODE=DEV
+VITE_LOCAL=http://localhost:3000
+```
 
-   - `MONGODB_URI`: Your MongoDB Atlas connection string.
-   - `PORT`: Port for the backend server.
-   - `SECRET_KEY`: A secret key for JWT tokens; keep it secure and unique.
-   - `NODE_ENV`: Environment mode (development/production).
-   - `ORIGIN`: Allowed origin for CORS (frontend URL).
+| Variable | Description |
+|---|---|
+| `MONGODB_URI` | Your MongoDB Atlas connection string |
+| `SECRET_KEY` | Secret key for JWT tokens — keep it secure |
+| `VITE_MODE=DEV` | Uses `VITE_LOCAL` → your local backend |
+| `VITE_MODE=PROD` | Uses `VITE_SERVER` → hosted Render backend |
 
-   `Frontend/.env`:
-   ```env
-   VITE_SERVER=https://inventory-management-backend-hsaf.onrender.com
-   VITE_MODE=DEV
-   VITE_LOCAL=http://localhost:3000
-   ```
+> **Security Note:** Never commit `.env` files to version control. Add them to `.gitignore`.
 
-   - `VITE_SERVER`: URL of the production backend.
-   - `VITE_MODE`: Set to `DEV` for local development (uses `VITE_LOCAL`), or `PROD` for production (uses `VITE_SERVER`).
-   - `VITE_LOCAL`: URL of the local backend.
-
-   > **Security Note:** Never commit `.env` files to version control. Add them to `.gitignore`. Use strong, unique secrets in production.
-
+---
 
 ### Option 1: Pull from Docker Hub (Fastest)
 
@@ -226,7 +246,7 @@ cd Smart-Inventory-Management-System/Website/Inventory-Management-System-MERN-St
 docker compose up --build
 ```
 
-**5. Open the app:**
+**3. Open the app:**
 - Frontend: [http://localhost:5173](http://localhost:5173)
 - Backend API: [http://localhost:3000](http://localhost:3000)
 
@@ -251,7 +271,106 @@ docker compose up --build
 
 ---
 
-### Option 3: Run Manually
+### Option 3: Deploy with Kubernetes
+
+This deploys the application on a Kubernetes cluster using pre-built production images from Docker Hub.
+
+**Docker Hub images used:**
+
+| Image | Docker Hub |
+|-------|-----------|
+| Frontend | [`ahmedwalid1410/ims-frontend-k8s`](https://hub.docker.com/r/ahmedwalid1410/ims-frontend-k8s) |
+| Backend | [`ahmedwalid1410/ims-backend-k8s`](https://hub.docker.com/r/ahmedwalid1410/ims-backend-k8s) |
+
+> These images are built by the Jenkins CI/CD pipeline and are production-ready (frontend served by Nginx on port 80).
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/aw1784/Smart-Inventory-Management-System.git
+cd Smart-Inventory-Management-System/Website/Inventory-Management-System-MERN-Stack-main
+```
+
+**2. Update the secret with your MongoDB credentials:**
+
+Edit `k8s/backend/secret.yaml` and replace the placeholder values:
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ims-backend-secret
+  namespace: ims
+type: Opaque
+stringData:
+  MONGODB_URI: "mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/ims?retryWrites=true&w=majority"
+  SECRET_KEY: "your-long-random-secret-key"
+```
+
+**3. Deploy everything:**
+```bash
+bash k8s/K8s_run.sh
+```
+
+This script applies all manifests in order:
+```
+namespace → configmap → secret → backend deployment → backend service → frontend deployment → frontend service
+```
+
+**4. Verify pods are running:**
+```bash
+kubectl get all -n ims
+```
+
+You should see:
+```
+pod/ims-backend-xxx    1/1   Running   ✅
+pod/ims-frontend-xxx   1/1   Running   ✅
+```
+
+**5. Access the app via port-forwarding:**
+
+Open **two separate terminals:**
+
+Terminal 1 — Backend:
+```bash
+bash k8s/port-forward-backend.sh
+```
+
+Terminal 2 — Frontend:
+```bash
+bash k8s/port-forward-frontend.sh
+```
+
+Then open:
+- Frontend: [http://localhost:5173](http://localhost:5173)
+- Backend API: [http://localhost:3000](http://localhost:3000)
+
+**6. Stop the deployment:**
+```bash
+bash k8s/K8s_Stop.sh
+```
+
+**Useful kubectl commands:**
+```bash
+# Watch pods starting up
+kubectl get pods -n ims -w
+
+# View backend logs
+kubectl logs deployment/ims-backend -n ims
+
+# View frontend logs
+kubectl logs deployment/ims-frontend -n ims
+
+# Describe a pod for debugging
+kubectl describe pod <pod-name> -n ims
+
+# Delete and redeploy everything
+bash k8s/K8s_Stop.sh
+bash k8s/K8s_run.sh
+```
+
+---
+
+### Option 4: Run Manually
 
 **1. Clone the repository:**
 ```bash
@@ -300,6 +419,8 @@ Checkout → Build Images (parallel) → Push to Docker Hub
 |-------|------|------|
 | `ahmedwalid1410/ims-backend` | `latest`, `<build-number>` | [View on Docker Hub](https://hub.docker.com/r/ahmedwalid1410/ims-backend) |
 | `ahmedwalid1410/ims-frontend` | `latest`, `<build-number>` | [View on Docker Hub](https://hub.docker.com/r/ahmedwalid1410/ims-frontend) |
+| `ahmedwalid1410/ims-backend-k8s` | `latest`, `<build-number>` | [View on Docker Hub](https://hub.docker.com/r/ahmedwalid1410/ims-backend-k8s) |
+| `ahmedwalid1410/ims-frontend-k8s` | `latest`, `<build-number>` | [View on Docker Hub](https://hub.docker.com/r/ahmedwalid1410/ims-frontend-k8s) |
 
 ### Jenkins Setup Requirements
 
