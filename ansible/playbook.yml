@@ -1,13 +1,18 @@
 ---
-- name: Setup Docker, Jenkins, Ngrok and Project Structure
+- name: Setup Production Environment and Deploy Application
   hosts: all
   become: yes
   vars:
-   
-    project_dir: "/opt/TEST"
+    project_name: "Smart-Inventory-Management-System"
+    project_path: "/opt/{{ project_name }}"
+    ngrok_auth_token: "YOUR_NGROK_AUTH_TOKEN_HERE"
+    github_repo: "https://github.com/aw1784/Smart-Inventory-Management-System.git"
 
   tasks:
-    - name: Update apt cache and install basic dependencies
+    # ==========================================
+    # 1. System Prerequisites
+    # ==========================================
+    - name: Install required system packages
       apt:
         name:
           - apt-transport-https
@@ -15,51 +20,51 @@
           - curl
           - software-properties-common
           - gnupg
-          - unzip
-          - openjdk-21-jre 
+          - git
+          - openjdk-21-jre
         state: present
         update_cache: yes
 
     # ==========================================
-    # 1. Docker Setup
+    # 2. Docker Setup
     # ==========================================
-    - name: Add Docker GPG key
+    - name: Add Docker GPG apt Key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    - name: Add Docker APT repository
+    - name: Add Docker Repository
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
 
-    - name: Install Docker components
+    - name: Install Docker and Docker Compose
       apt:
         name:
           - docker-ce
           - docker-ce-cli
           - containerd.io
           - docker-compose-plugin
-        state: present
+        state: latest
         update_cache: yes
 
-    - name: Ensure Docker service is started and enabled
+    - name: Ensure Docker service is running and enabled
       service:
         name: docker
         state: started
         enabled: yes
 
     # ==========================================
-    # 2. Jenkins Setup
+    # 3. Jenkins Setup
     # ==========================================
     - name: Add Jenkins GPG key
       apt_key:
         url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
         state: present
 
-    - name: Add Jenkins APT repository
+    - name: Add Jenkins Repository
       apt_repository:
-        repo: deb https://pkg.jenkins.io/debian-stable binary/
+        repo: "deb https://pkg.jenkins.io/debian-stable binary/"
         state: present
 
     - name: Install Jenkins
@@ -68,64 +73,50 @@
         state: present
         update_cache: yes
 
-    - name: Ensure Jenkins service is started and enabled
+    - name: Ensure Jenkins service is running and enabled
       service:
         name: jenkins
         state: started
         enabled: yes
 
     # ==========================================
-    # 3. Ngrok Setup
+    # 4. Ngrok Setup
     # ==========================================
-    - name: Download Ngrok archive
-      get_url:
-        url: https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
-        dest: /tmp/ngrok.tgz
+    - name: Install Ngrok via Snap
+      snap:
+        name: ngrok
+        state: present
 
-    - name: Extract Ngrok to /usr/local/bin
-      unarchive:
-        src: /tmp/ngrok.tgz
-        dest: /usr/local/bin
-        remote_src: yes
-
-    - name: Set executable permissions for Ngrok
-      file:
-        path: /usr/local/bin/ngrok
-        mode: '0755'
+    - name: Configure Ngrok Auth Token
+      command: "ngrok config add-authtoken {{ ngrok_auth_token }}"
+      when: ngrok_auth_token != 'YOUR_NGROK_AUTH_TOKEN_HERE'
 
     # ==========================================
-    # 4. Project Folder Structure
+    # 5. Application Deployment (Git & Env Injection)
     # ==========================================
-    - name: Create the main project directory
-      file:
-        path: "{{ project_dir }}"
-        state: directory
-        mode: '0755'
+    - name: Clone the application repository from GitHub
+      git:
+        repo: "{{ github_repo }}"
+        dest: "{{ project_path }}"
+        version: main
+        force: yes
 
-    - name: Create Backend and Frontend directories
-      file:
-        path: "{{ project_dir }}/{{ item }}"
-        state: directory
-        mode: '0755'
-      loop:
-        - Backend
-        - Frontend
-
-    - name: Create .env files inside Backend and Frontend
+    - name: Inject Backend .env file for Production
       copy:
-        content: "# Environment variables for {{ item }}\n"
-        dest: "{{ project_dir }}/{{ item }}/.env"
+        dest: "{{ project_path }}/Backend/.env"
         mode: '0644'
-        force: no 
-      loop:
-        - Backend
-        - Frontend
-
-    - name: Create docker-compose.prod.yml file
-      copy:
         content: |
-          version: '3.8'
-          # Add your production services configuration here
-        dest: "{{ project_dir }}/docker-compose.prod.yml"
+          MONGODB_URI=your_mongodb_connection_string_here
+          PORT=3000
+          SECRET_KEY=your_super_secret_key_for_production
+          NODE_ENV=production
+          ORIGIN=http://{{ inventory_hostname }}:5173
+
+    - name: Inject Frontend .env file for Production
+      copy:
+        dest: "{{ project_path }}/Frontend/.env"
         mode: '0644'
-        force: no
+        content: |
+          VITE_SERVER=http://{{ inventory_hostname }}:3000
+          VITE_MODE=PROD
+          VITE_LOCAL=http://localhost:3000
