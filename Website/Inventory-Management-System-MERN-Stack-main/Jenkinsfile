@@ -6,6 +6,8 @@ pipeline {
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
         FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
         BACKEND_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend"
+        FRONTEND_K8S_IMAGE    = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend-k8s"
+        BACKEND_K8S_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend-k8s"        
         IMAGE_TAG             = "${BUILD_NUMBER}"
         APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
     }
@@ -26,25 +28,51 @@ pipeline {
 
         stage('Build Images') {
             parallel {
-                stage('Build Backend Image') {
-                    steps {
-                        sh '''
-                            docker build \
-                                -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${BACKEND_IMAGE}:latest \
-                                ${APP_DIR}/Backend
-                        '''
-                    }
+
+            stage('Build Backend Image') {
+                steps {
+                    sh '''
+                        docker build \
+                            -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
+                            -t ${BACKEND_IMAGE}:latest \
+                            ${APP_DIR}/Backend
+                    '''
                 }
-                stage('Build Frontend Image') {
-                    steps {
-                        sh '''
-                            docker build \
-                                -f ${APP_DIR}/Frontend/dockerfile.dev \
-                                -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${FRONTEND_IMAGE}:latest \
-                                ${APP_DIR}/Frontend
-                        '''
+            }
+
+            stage('Build Backend K8s Image') {
+                steps {
+                    sh '''
+                        docker build \
+                            -f ${APP_DIR}/Backend/Dockerfile \
+                            -t ${BACKEND_K8S_IMAGE}:${IMAGE_TAG} \
+                            -t ${BACKEND_K8S_IMAGE}:latest \
+                            ${APP_DIR}/Backend
+                    '''
+                }
+            }
+
+            stage('Build Frontend Image') {
+                steps {
+                    sh '''
+                        docker build \
+                            -f ${APP_DIR}/Frontend/dockerfile.dev \
+                            -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
+                            -t ${FRONTEND_IMAGE}:latest \
+                            ${APP_DIR}/Frontend
+                    '''
+                }
+            }
+
+            stage('Build Frontend K8s Image') {
+                steps {
+                    sh '''
+                        docker build \
+                            -f ${APP_DIR}/Frontend/dockerfile.k8s \
+                            -t ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG} \
+                            -t ${FRONTEND_K8S_IMAGE}:latest \
+                            ${APP_DIR}/Frontend
+                    '''
                     }
                 }
             }
@@ -56,8 +84,15 @@ pipeline {
                 sh '''
                     docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
                     docker push ${BACKEND_IMAGE}:latest
+
                     docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
                     docker push ${FRONTEND_IMAGE}:latest
+
+                    docker push ${BACKEND_K8S_IMAGE}:${IMAGE_TAG}
+                    docker push ${BACKEND_K8S_IMAGE}:latest
+
+                    docker push ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG}
+                    docker push ${FRONTEND_K8S_IMAGE}:latest
                 '''
             }
         }
@@ -73,7 +108,9 @@ pipeline {
         success {
             echo "Pipeline succeeded!"
             echo "Backend image:  ${BACKEND_IMAGE}:${IMAGE_TAG}"
+            echo "Backend image:  ${BACKEND_K8S_IMAGE}:${IMAGE_TAG}"
             echo "Frontend image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            echo "Frontend image: ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG}"
         }
         failure {
             echo "Pipeline failed at stage: ${env.STAGE_NAME}"
@@ -83,6 +120,8 @@ pipeline {
                 sh '''
                     docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
                     docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} || true
+                    docker rmi ${BACKEND_K8S_IMAGE}:${IMAGE_TAG} || true
+                    docker rmi ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG} || true
                 '''
             }
         }

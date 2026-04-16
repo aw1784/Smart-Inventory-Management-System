@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ims-backend-config
+  namespace: ims
+data:
+  PORT: "3000"
+  NODE_ENV: "development"
