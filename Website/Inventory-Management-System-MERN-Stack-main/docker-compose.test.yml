@@ -6,6 +6,7 @@ services:
     container_name: ims-auth-test
     environment:
       JWT_SECRET: test-secret
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
@@ -14,6 +15,8 @@ services:
       context: ./backend/product-service
       dockerfile: Dockerfile.test
     container_name: ims-product-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
@@ -22,6 +25,8 @@ services:
       context: ./backend/order-service
       dockerfile: Dockerfile.test
     container_name: ims-order-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
@@ -30,6 +35,8 @@ services:
       context: ./backend/inventory-service
       dockerfile: Dockerfile.test
     container_name: ims-inventory-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
@@ -38,6 +45,8 @@ services:
       context: ./backend/statistics-service
       dockerfile: Dockerfile.test
     container_name: ims-statistics-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
@@ -48,6 +57,7 @@ services:
     container_name: ims-gateway-test
     environment:
       JWT_SECRET: test-secret
+      MONGOMS_VERSION: "7.0.14"
     networks:
       - ims-test-net
 
