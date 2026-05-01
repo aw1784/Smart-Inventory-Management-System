@@ -72,7 +72,7 @@ pipeline {
                             docker build \
                                 -t ${AUTH_IMAGE}:${IMAGE_TAG} \
                                 -t ${AUTH_IMAGE}:latest \
-                                ${APP_DIR}/backend/auth-service
+                                ${APP_DIR}/Backend/auth-service
                         '''
                     }
                 }
@@ -83,7 +83,7 @@ pipeline {
                             docker build \
                                 -t ${PRODUCT_IMAGE}:${IMAGE_TAG} \
                                 -t ${PRODUCT_IMAGE}:latest \
-                                ${APP_DIR}/backend/product-service
+                                ${APP_DIR}/Backend/product-service
                         '''
                     }
                 }
@@ -94,7 +94,7 @@ pipeline {
                             docker build \
                                 -t ${ORDER_IMAGE}:${IMAGE_TAG} \
                                 -t ${ORDER_IMAGE}:latest \
-                                ${APP_DIR}/backend/order-service
+                                ${APP_DIR}/Backend/order-service
                         '''
                     }
                 }
@@ -105,7 +105,7 @@ pipeline {
                             docker build \
                                 -t ${INVENTORY_IMAGE}:${IMAGE_TAG} \
                                 -t ${INVENTORY_IMAGE}:latest \
-                                ${APP_DIR}/backend/inventory-service
+                                ${APP_DIR}/Backend/inventory-service
                         '''
                     }
                 }
@@ -116,7 +116,7 @@ pipeline {
                             docker build \
                                 -t ${STATISTICS_IMAGE}:${IMAGE_TAG} \
                                 -t ${STATISTICS_IMAGE}:latest \
-                                ${APP_DIR}/backend/statistics-service
+                                ${APP_DIR}/Backend/statistics-service
                         '''
                     }
                 }
@@ -127,7 +127,7 @@ pipeline {
                             docker build \
                                 -t ${GATEWAY_IMAGE}:${IMAGE_TAG} \
                                 -t ${GATEWAY_IMAGE}:latest \
-                                ${APP_DIR}/backend/api-gateway
+                                ${APP_DIR}/Backend/api-gateway
                         '''
                     }
                 }
@@ -138,7 +138,7 @@ pipeline {
                             docker build \
                                 -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
                                 -t ${FRONTEND_IMAGE}:latest \
-                                ${APP_DIR}/frontend
+                                ${APP_DIR}/Frontend
                         '''
                     }
                 }
