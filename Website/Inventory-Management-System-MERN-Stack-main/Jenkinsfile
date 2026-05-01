@@ -4,10 +4,17 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
-        FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
-        BACKEND_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend"
-        IMAGE_TAG             = "${BUILD_NUMBER}"
-        APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
+
+        AUTH_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-auth-service"
+        PRODUCT_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-product-service"
+        ORDER_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-order-service"
+        INVENTORY_IMAGE   = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
+        STATISTICS_IMAGE  = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
+        GATEWAY_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
+        FRONTEND_IMAGE    = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
+
+        IMAGE_TAG         = "${BUILD_NUMBER}"
+        APP_DIR           = "inventory-management-MERN"
     }
 
     triggers {
@@ -23,27 +30,115 @@ pipeline {
             }
         }
 
+        stage('Run Tests') {
+            steps {
+                // -e ensures the script aborts on the first failing test container
+                // and propagates a non-zero exit code so the stage fails.
+                sh '''
+                    set -e
+                    cd ${APP_DIR}
+                    docker compose -f docker-compose.test.yml build
+                    docker compose -f docker-compose.test.yml run --rm auth-test
+                    docker compose -f docker-compose.test.yml run --rm product-test
+                    docker compose -f docker-compose.test.yml run --rm order-test
+                    docker compose -f docker-compose.test.yml run --rm inventory-test
+                    docker compose -f docker-compose.test.yml run --rm statistics-test
+                    docker compose -f docker-compose.test.yml run --rm gateway-test
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        cd ${APP_DIR}
+                        docker compose -f docker-compose.test.yml down --remove-orphans || true
+                    '''
+                }
+                failure {
+                    echo "Tests FAILED — Build & Push stages will be skipped."
+                }
+            }
+        }
 
         stage('Build Images') {
+            // Only run if no prior stage (i.e. tests) failed
+            when {
+                expression { return currentBuild.currentResult == 'SUCCESS' }
+            }
             parallel {
-                stage('Build Backend Image') {
+
+                stage('Build auth-service') {
                     steps {
                         sh '''
                             docker build \
-                                -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${BACKEND_IMAGE}:latest \
-                                ${APP_DIR}/Backend
+                                -t ${AUTH_IMAGE}:${IMAGE_TAG} \
+                                -t ${AUTH_IMAGE}:latest \
+                                ${APP_DIR}/backend/auth-service
                         '''
                     }
                 }
-                stage('Build Frontend Image') {
+
+                stage('Build product-service') {
                     steps {
                         sh '''
                             docker build \
-                                -f ${APP_DIR}/Frontend/dockerfile.dev \
+                                -t ${PRODUCT_IMAGE}:${IMAGE_TAG} \
+                                -t ${PRODUCT_IMAGE}:latest \
+                                ${APP_DIR}/backend/product-service
+                        '''
+                    }
+                }
+
+                stage('Build order-service') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -t ${ORDER_IMAGE}:${IMAGE_TAG} \
+                                -t ${ORDER_IMAGE}:latest \
+                                ${APP_DIR}/backend/order-service
+                        '''
+                    }
+                }
+
+                stage('Build inventory-service') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -t ${INVENTORY_IMAGE}:${IMAGE_TAG} \
+                                -t ${INVENTORY_IMAGE}:latest \
+                                ${APP_DIR}/backend/inventory-service
+                        '''
+                    }
+                }
+
+                stage('Build statistics-service') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -t ${STATISTICS_IMAGE}:${IMAGE_TAG} \
+                                -t ${STATISTICS_IMAGE}:latest \
+                                ${APP_DIR}/backend/statistics-service
+                        '''
+                    }
+                }
+
+                stage('Build api-gateway') {
+                    steps {
+                        sh '''
+                            docker build \
+                                -t ${GATEWAY_IMAGE}:${IMAGE_TAG} \
+                                -t ${GATEWAY_IMAGE}:latest \
+                                ${APP_DIR}/backend/api-gateway
+                        '''
+                    }
+                }
+
+                stage('Build frontend') {
+                    steps {
+                        sh '''
+                            docker build \
                                 -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
                                 -t ${FRONTEND_IMAGE}:latest \
-                                ${APP_DIR}/Frontend
+                                ${APP_DIR}/frontend
                         '''
                     }
                 }
@@ -51,17 +146,24 @@ pipeline {
         }
 
         stage('Push to Docker Hub') {
+            // Skip push entirely if tests failed OR if any image build failed
+            when {
+                expression { return currentBuild.currentResult == 'SUCCESS' }
+            }
             steps {
                 sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
                 sh '''
-                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
-                    docker push ${BACKEND_IMAGE}:latest
-                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
-                    docker push ${FRONTEND_IMAGE}:latest
+                    set -e
+                    docker push ${AUTH_IMAGE}:${IMAGE_TAG}        && docker push ${AUTH_IMAGE}:latest
+                    docker push ${PRODUCT_IMAGE}:${IMAGE_TAG}     && docker push ${PRODUCT_IMAGE}:latest
+                    docker push ${ORDER_IMAGE}:${IMAGE_TAG}       && docker push ${ORDER_IMAGE}:latest
+                    docker push ${INVENTORY_IMAGE}:${IMAGE_TAG}   && docker push ${INVENTORY_IMAGE}:latest
+                    docker push ${STATISTICS_IMAGE}:${IMAGE_TAG}  && docker push ${STATISTICS_IMAGE}:latest
+                    docker push ${GATEWAY_IMAGE}:${IMAGE_TAG}     && docker push ${GATEWAY_IMAGE}:latest
+                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}    && docker push ${FRONTEND_IMAGE}:latest
                 '''
             }
         }
-
     }
 
     post {
@@ -71,18 +173,28 @@ pipeline {
             }
         }
         success {
-            echo "Pipeline succeeded!"
-            echo "Backend image:  ${BACKEND_IMAGE}:${IMAGE_TAG}"
-            echo "Frontend image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            echo "Pipeline succeeded — images pushed:"
+            echo "auth-service:        ${AUTH_IMAGE}:${IMAGE_TAG}"
+            echo "product-service:     ${PRODUCT_IMAGE}:${IMAGE_TAG}"
+            echo "order-service:       ${ORDER_IMAGE}:${IMAGE_TAG}"
+            echo "inventory-service:   ${INVENTORY_IMAGE}:${IMAGE_TAG}"
+            echo "statistics-service:  ${STATISTICS_IMAGE}:${IMAGE_TAG}"
+            echo "api-gateway:         ${GATEWAY_IMAGE}:${IMAGE_TAG}"
+            echo "frontend:            ${FRONTEND_IMAGE}:${IMAGE_TAG}"
         }
         failure {
-            echo "Pipeline failed at stage: ${env.STAGE_NAME}"
+            echo "Pipeline failed at stage: ${env.STAGE_NAME} — NO images were pushed to Docker Hub."
         }
         cleanup {
             node('') {
                 sh '''
-                    docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
-                    docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} || true
+                    docker rmi ${AUTH_IMAGE}:${IMAGE_TAG}       || true
+                    docker rmi ${PRODUCT_IMAGE}:${IMAGE_TAG}    || true
+                    docker rmi ${ORDER_IMAGE}:${IMAGE_TAG}      || true
+                    docker rmi ${INVENTORY_IMAGE}:${IMAGE_TAG}  || true
+                    docker rmi ${STATISTICS_IMAGE}:${IMAGE_TAG} || true
+                    docker rmi ${GATEWAY_IMAGE}:${IMAGE_TAG}    || true
+                    docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG}   || true
                 '''
             }
         }

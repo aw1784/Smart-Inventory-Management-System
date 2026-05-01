@@ -1,0 +1,56 @@
+services:
+  auth-test:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile.test
+    container_name: ims-auth-test
+    environment:
+      JWT_SECRET: test-secret
+    networks:
+      - ims-test-net
+
+  product-test:
+    build:
+      context: ./backend/product-service
+      dockerfile: Dockerfile.test
+    container_name: ims-product-test
+    networks:
+      - ims-test-net
+
+  order-test:
+    build:
+      context: ./backend/order-service
+      dockerfile: Dockerfile.test
+    container_name: ims-order-test
+    networks:
+      - ims-test-net
+
+  inventory-test:
+    build:
+      context: ./backend/inventory-service
+      dockerfile: Dockerfile.test
+    container_name: ims-inventory-test
+    networks:
+      - ims-test-net
+
+  statistics-test:
+    build:
+      context: ./backend/statistics-service
+      dockerfile: Dockerfile.test
+    container_name: ims-statistics-test
+    networks:
+      - ims-test-net
+
+  gateway-test:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile.test
+    container_name: ims-gateway-test
+    environment:
+      JWT_SECRET: test-secret
+    networks:
+      - ims-test-net
+
+networks:
+  ims-test-net:
+    driver: bridge

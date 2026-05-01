@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: inventory-management
+  labels:
+    app: product-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+        - name: product-service
+          image: DOCKERHUB_USER/ims-product-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4002
+          env:
+            - name: PRODUCT_SERVICE_PORT
+              value: "4002"
+            - name: PRODUCT_MONGO_URI
+              value: "mongodb://mongo:27017/inventory_products"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: inventory-management
+spec:
+  selector:
+    app: product-service
+  ports:
+    - port: 4002
+      targetPort: 4002
+  type: ClusterIP

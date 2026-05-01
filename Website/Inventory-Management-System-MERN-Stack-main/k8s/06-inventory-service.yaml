@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: inventory-management
+  labels:
+    app: inventory-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: DOCKERHUB_USER/ims-inventory-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4004
+          env:
+            - name: INVENTORY_SERVICE_PORT
+              value: "4004"
+            - name: INVENTORY_MONGO_URI
+              value: "mongodb://mongo:27017/inventory_stock"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: inventory-management
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - port: 4004
+      targetPort: 4004
+  type: ClusterIP

@@ -1,0 +1,148 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: ims-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - ims-net
+
+  auth-service:
+    build:
+      context: ./backend/auth-service
+      dockerfile: Dockerfile
+    container_name: ims-auth
+    restart: unless-stopped
+    environment:
+      AUTH_SERVICE_PORT: 4001
+      AUTH_MONGO_URI: mongodb://mongo:27017/inventory_auth
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+    depends_on:
+      - mongo
+    ports:
+      - "4001:4001"
+    networks:
+      - ims-net
+
+  product-service:
+    build:
+      context: ./backend/product-service
+      dockerfile: Dockerfile
+    container_name: ims-product
+    restart: unless-stopped
+    environment:
+      PRODUCT_SERVICE_PORT: 4002
+      PRODUCT_MONGO_URI: mongodb://mongo:27017/inventory_products
+    depends_on:
+      - mongo
+    ports:
+      - "4002:4002"
+    networks:
+      - ims-net
+
+  order-service:
+    build:
+      context: ./backend/order-service
+      dockerfile: Dockerfile
+    container_name: ims-order
+    restart: unless-stopped
+    environment:
+      ORDER_SERVICE_PORT: 4003
+      ORDER_MONGO_URI: mongodb://mongo:27017/inventory_orders
+      INVENTORY_SERVICE_URL: http://inventory-service:4004
+    depends_on:
+      - mongo
+      - inventory-service
+    ports:
+      - "4003:4003"
+    networks:
+      - ims-net
+
+  inventory-service:
+    build:
+      context: ./backend/inventory-service
+      dockerfile: Dockerfile
+    container_name: ims-inventory
+    restart: unless-stopped
+    environment:
+      INVENTORY_SERVICE_PORT: 4004
+      INVENTORY_MONGO_URI: mongodb://mongo:27017/inventory_inventory
+    depends_on:
+      - mongo
+    ports:
+      - "4004:4004"
+    networks:
+      - ims-net
+
+  statistics-service:
+    build:
+      context: ./backend/statistics-service
+      dockerfile: Dockerfile
+    container_name: ims-statistics
+    restart: unless-stopped
+    environment:
+      STATISTICS_SERVICE_PORT: 4005
+      STATISTICS_MONGO_URI: mongodb://mongo:27017/inventory_statistics
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PRODUCT_SERVICE_URL: http://product-service:4002
+      ORDER_SERVICE_URL: http://order-service:4003
+      INVENTORY_SERVICE_URL: http://inventory-service:4004
+    depends_on:
+      - mongo
+      - auth-service
+      - product-service
+      - order-service
+      - inventory-service
+    ports:
+      - "4005:4005"
+    networks:
+      - ims-net
+
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+      dockerfile: Dockerfile
+    container_name: ims-gateway
+    restart: unless-stopped
+    environment:
+      GATEWAY_PORT: 4000
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      AUTH_SERVICE_URL: http://auth-service:4001
+      PRODUCT_SERVICE_URL: http://product-service:4002
+      ORDER_SERVICE_URL: http://order-service:4003
+      INVENTORY_SERVICE_URL: http://inventory-service:4004
+      STATISTICS_SERVICE_URL: http://statistics-service:4005
+    depends_on:
+      - auth-service
+      - product-service
+      - order-service
+      - inventory-service
+      - statistics-service
+    ports:
+      - "4000:4000"
+    networks:
+      - ims-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ims-frontend
+    restart: unless-stopped
+    depends_on:
+      - api-gateway
+    ports:
+      - "3000:80"
+    networks:
+      - ims-net
+
+volumes:
+  mongo-data:
+
+networks:
+  ims-net:
+    driver: bridge

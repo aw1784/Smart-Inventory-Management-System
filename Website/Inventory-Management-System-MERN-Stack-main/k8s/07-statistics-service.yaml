@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: statistics-service
+  namespace: inventory-management
+  labels:
+    app: statistics-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: statistics-service
+  template:
+    metadata:
+      labels:
+        app: statistics-service
+    spec:
+      containers:
+        - name: statistics-service
+          image: DOCKERHUB_USER/ims-statistics-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4005
+          env:
+            - name: STATISTICS_SERVICE_PORT
+              value: "4005"
+            - name: STATISTICS_MONGO_URI
+              value: "mongodb://mongo:27017/inventory_statistics"
+            - name: AUTH_SERVICE_URL
+              value: "http://auth-service:4001"
+            - name: PRODUCT_SERVICE_URL
+              value: "http://product-service:4002"
+            - name: ORDER_SERVICE_URL
+              value: "http://order-service:4003"
+            - name: INVENTORY_SERVICE_URL
+              value: "http://inventory-service:4004"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: statistics-service
+  namespace: inventory-management
+spec:
+  selector:
+    app: statistics-service
+  ports:
+    - port: 4005
+      targetPort: 4005
+  type: ClusterIP
