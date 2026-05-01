@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --no-audit --no-fund
+ENV MONGOMS_VERSION=7.0.14
+RUN node -e "require('mongodb-memory-server-core').MongoBinary.getPath().then(p => console.log('MongoDB cached at:', p))"
 COPY . .
 ENV NODE_ENV=test
 CMD ["npm", "test"]
