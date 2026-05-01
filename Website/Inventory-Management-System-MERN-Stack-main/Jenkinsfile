@@ -14,7 +14,7 @@ pipeline {
         FRONTEND_IMAGE    = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
 
         IMAGE_TAG         = "${BUILD_NUMBER}"
-        APP_DIR           = "inventory-management-MERN"
+        APP_DIR           = "Inventory-Management-System-MERN-Stack-main"
     }
 
     triggers {
