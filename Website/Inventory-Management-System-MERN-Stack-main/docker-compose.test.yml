@@ -1,7 +1,7 @@
 services:
   auth-test:
     build:
-      context: ./backend/auth-service
+      context: ./Backend/auth-service
       dockerfile: Dockerfile.test
     container_name: ims-auth-test
     environment:
@@ -12,7 +12,7 @@ services:
 
   product-test:
     build:
-      context: ./backend/product-service
+      context: ./Backend/product-service
       dockerfile: Dockerfile.test
     container_name: ims-product-test
     environment:
@@ -22,7 +22,7 @@ services:
 
   order-test:
     build:
-      context: ./backend/order-service
+      context: ./Backend/order-service
       dockerfile: Dockerfile.test
     container_name: ims-order-test
     environment:
@@ -32,7 +32,7 @@ services:
 
   inventory-test:
     build:
-      context: ./backend/inventory-service
+      context: ./Backend/inventory-service
       dockerfile: Dockerfile.test
     container_name: ims-inventory-test
     environment:
@@ -42,7 +42,7 @@ services:
 
   statistics-test:
     build:
-      context: ./backend/statistics-service
+      context: ./Backend/statistics-service
       dockerfile: Dockerfile.test
     container_name: ims-statistics-test
     environment:
@@ -52,7 +52,7 @@ services:
 
   gateway-test:
     build:
-      context: ./backend/api-gateway
+      context: ./Backend/api-gateway
       dockerfile: Dockerfile.test
     container_name: ims-gateway-test
     environment:
