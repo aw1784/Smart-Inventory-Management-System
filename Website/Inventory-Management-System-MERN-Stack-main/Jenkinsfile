@@ -4,17 +4,15 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
-
-        AUTH_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-auth-service"
-        PRODUCT_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-product-service"
-        ORDER_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-order-service"
-        INVENTORY_IMAGE   = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
-        STATISTICS_IMAGE  = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
-        GATEWAY_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
-        FRONTEND_IMAGE    = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
-
-        IMAGE_TAG         = "${BUILD_NUMBER}"
-        APP_DIR           = "Inventory-Management-System-MERN-Stack-main"
+        AUTH_IMAGE            = "${DOCKERHUB_CREDENTIALS_USR}/ims-auth-service"
+        PRODUCT_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-product-service"
+        ORDER_IMAGE           = "${DOCKERHUB_CREDENTIALS_USR}/ims-order-service"
+        INVENTORY_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
+        STATISTICS_IMAGE      = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
+        GATEWAY_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
+        FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"      
+        IMAGE_TAG             = "${BUILD_NUMBER}"
+        APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
     }
 
     triggers {
