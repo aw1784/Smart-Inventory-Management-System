@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: inventory-service
-          image: DOCKERHUB_USER/ims-inventory-service:latest
+          image: ahmedwalid1410/ims-inventory-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4004

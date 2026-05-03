@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: statistics-service
-          image: DOCKERHUB_USER/ims-statistics-service:latest
+          image: ahmedwalid1410/ims-statistics-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4005

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: DOCKERHUB_USER/ims-auth-service:latest
+          image: ahmedwalid1410/ims-auth-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4001

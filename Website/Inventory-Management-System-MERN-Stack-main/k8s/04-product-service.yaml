@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: product-service
-          image: DOCKERHUB_USER/ims-product-service:latest
+          image: ahmedwalid1410/ims-product-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 4002
