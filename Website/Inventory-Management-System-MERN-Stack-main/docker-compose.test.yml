@@ -1,0 +1,66 @@
+services:
+  auth-test:
+    build:
+      context: ./Backend/auth-service
+      dockerfile: Dockerfile.test
+    container_name: ims-auth-test
+    environment:
+      JWT_SECRET: test-secret
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+  product-test:
+    build:
+      context: ./Backend/product-service
+      dockerfile: Dockerfile.test
+    container_name: ims-product-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+  order-test:
+    build:
+      context: ./Backend/order-service
+      dockerfile: Dockerfile.test
+    container_name: ims-order-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+  inventory-test:
+    build:
+      context: ./Backend/inventory-service
+      dockerfile: Dockerfile.test
+    container_name: ims-inventory-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+  statistics-test:
+    build:
+      context: ./Backend/statistics-service
+      dockerfile: Dockerfile.test
+    container_name: ims-statistics-test
+    environment:
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+  gateway-test:
+    build:
+      context: ./Backend/api-gateway
+      dockerfile: Dockerfile.test
+    container_name: ims-gateway-test
+    environment:
+      JWT_SECRET: test-secret
+      MONGOMS_VERSION: "7.0.14"
+    networks:
+      - ims-test-net
+
+networks:
+  ims-test-net:
+    driver: bridge

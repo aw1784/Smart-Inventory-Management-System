@@ -1,26 +1,14 @@
 {
-  "name": "backendapi",
+  "name": "inventory-management-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
-  "type": "module",
-  "engines": {
-    "node": "18.8.0"
-  },
+  "description": "Backend microservices entry point",
+  "private": true,
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js"
+    "install:all": "npm --prefix auth-service install && npm --prefix product-service install && npm --prefix order-service install && npm --prefix inventory-service install && npm --prefix statistics-service install && npm --prefix api-gateway install",
+    "start": "concurrently -n gateway,auth,product,order,inventory,statistics -c blue,green,magenta,cyan,yellow,white \"npm --prefix api-gateway start\" \"npm --prefix auth-service start\" \"npm --prefix product-service start\" \"npm --prefix order-service start\" \"npm --prefix inventory-service start\" \"npm --prefix statistics-service start\"",
+    "test": "npm --prefix auth-service test && npm --prefix product-service test && npm --prefix order-service test && npm --prefix inventory-service test && npm --prefix statistics-service test && npm --prefix api-gateway test"
   },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "bcrypt": "^5.1.1",
-    "cookie-parser": "^1.4.6",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.2.0",
-    "mongoose": "^8.0.0"
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }
