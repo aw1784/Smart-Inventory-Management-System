@@ -1,0 +1,2 @@
+I renamed the Backend and Frontend directories to backend and frontend (the upper case didn't work)
+
