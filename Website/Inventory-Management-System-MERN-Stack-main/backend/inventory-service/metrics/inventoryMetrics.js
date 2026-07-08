@@ -1,33 +1,37 @@
 const client = require('prom-client');
+const Inventory = require('../models/inventoryModel');
 
-// Collect default Node.js metrics (CPU, memory, event loop, etc.)
+// Collect default Node.js metrics
 client.collectDefaultMetrics();
 
-// Counter: Number of inventory adjustments
+// =====================
+// Counters
+// =====================
+
 const inventoryAdjustmentsTotal = new client.Counter({
   name: 'inventory_adjustments_total',
   help: 'Total number of inventory adjustments',
 });
 
-// Counter: Number of large inventory adjustments (>100)
 const largeInventoryAdjustmentsTotal = new client.Counter({
   name: 'large_inventory_adjustments_total',
   help: 'Total number of inventory adjustments larger than 100 units',
 });
 
-// Counter: Number of inventory records created
 const inventoryCreateTotal = new client.Counter({
   name: 'inventory_create_total',
-  help: 'Total inventory records created',
+  help: 'Total number of inventory records created',
 });
 
-// Counter: Number of inventory records deleted
 const inventoryDeleteTotal = new client.Counter({
   name: 'inventory_delete_total',
-  help: 'Total inventory records deleted',
+  help: 'Total number of inventory records deleted',
 });
 
-// Gauges (current state)
+// =====================
+// Gauges
+// =====================
+
 const inventoryTotalProducts = new client.Gauge({
   name: 'inventory_total_products',
   help: 'Current total number of inventory records',
@@ -43,6 +47,40 @@ const inventoryOutOfStockProducts = new client.Gauge({
   help: 'Current number of out-of-stock products',
 });
 
+// =====================
+// Refresh Gauges
+// =====================
+
+async function updateInventoryGauges() {
+  try {
+    const totalProducts = await Inventory.countDocuments();
+
+    const outOfStockProducts = await Inventory.countDocuments({
+      quantity: 0,
+    });
+
+    const allProducts = await Inventory.find(
+      {},
+      {
+        quantity: 1,
+        lowStockThreshold: 1,
+      }
+    );
+
+    const lowStockProducts = allProducts.filter(
+      (item) =>
+        item.quantity > 0 &&
+        item.quantity <= item.lowStockThreshold
+    ).length;
+
+    inventoryTotalProducts.set(totalProducts);
+    inventoryLowStockProducts.set(lowStockProducts);
+    inventoryOutOfStockProducts.set(outOfStockProducts);
+  } catch (err) {
+    console.error('[metrics] Failed to update inventory gauges:', err);
+  }
+}
+
 module.exports = {
   client,
 
@@ -54,4 +92,6 @@ module.exports = {
   inventoryTotalProducts,
   inventoryLowStockProducts,
   inventoryOutOfStockProducts,
+
+  updateInventoryGauges,
 };
