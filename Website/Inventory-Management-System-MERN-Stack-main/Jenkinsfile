@@ -9,6 +9,9 @@
 //      page, under "Build Artifacts", so you can download them straight
 //      from Jenkins without touching Docker Hub at all.
 //
+// Run this on a real Jenkins controller with Docker installed on the agent
+// (Replit does not run Jenkins itself — see docs/jenkins/README.md).
+
 pipeline {
     agent any
 
@@ -124,9 +127,14 @@ pipeline {
                     mkdir -p ${ARTIFACT_DIR}
 
                     # 1) Frontend static bundle (the compiled React app) as a zip
-                    docker create --name frontend-extract ${FRONTEND_IMAGE}:${IMAGE_TAG}
-                    docker cp frontend-extract:/usr/share/nginx/html ${ARTIFACT_DIR}/frontend-dist
-                    docker rm frontend-extract
+                    # Use a build-number-suffixed container name so concurrent/retried
+                    # builds never collide, and clean up any leftover from a previous
+                    # failed/aborted run just in case.
+                    EXTRACT_CONTAINER="frontend-extract-${BUILD_NUMBER}"
+                    docker rm -f "${EXTRACT_CONTAINER}" >/dev/null 2>&1 || true
+                    docker create --name "${EXTRACT_CONTAINER}" ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    docker cp "${EXTRACT_CONTAINER}:/usr/share/nginx/html" ${ARTIFACT_DIR}/frontend-dist
+                    docker rm "${EXTRACT_CONTAINER}"
                     (cd ${ARTIFACT_DIR} && zip -r frontend-dist-${IMAGE_TAG}.zip frontend-dist && rm -rf frontend-dist)
 
                     # 2) Every backend image, exported as a portable .tar.gz
