@@ -1,15 +1,37 @@
+// Jenkinsfile — Inventory Management System (MERN microservices)
+//
+// This pipeline does two distinct things, both of which Jenkins calls an
+// "artifact":
+//   1. Docker Hub push  — publishes each service's image to a registry
+//      (a *remote* artifact other machines can `docker pull`).
+//   2. archiveArtifacts  — saves build outputs (frontend static bundle +
+//      exported Docker image .tar files) directly onto the Jenkins build
+//      page, under "Build Artifacts", so you can download them straight
+//      from Jenkins without touching Docker Hub at all.
+
+
 pipeline {
     agent any
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         DOCKERHUB_USERNAME    = "${DOCKERHUB_CREDENTIALS_USR}"
+        AUTH_IMAGE            = "${DOCKERHUB_CREDENTIALS_USR}/ims-auth-service"
+        PRODUCT_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-product-service"
+        ORDER_IMAGE           = "${DOCKERHUB_CREDENTIALS_USR}/ims-order-service"
+        INVENTORY_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
+        STATISTICS_IMAGE      = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
+        GATEWAY_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
         FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
-        BACKEND_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend"
-        FRONTEND_K8S_IMAGE    = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend-k8s"
-        BACKEND_K8S_IMAGE     = "${DOCKERHUB_CREDENTIALS_USR}/ims-backend-k8s"        
         IMAGE_TAG             = "${BUILD_NUMBER}"
         APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
+        ARTIFACT_DIR          = "Website/jenkins-artifacts"
+    }
+
+    // Toggle this to skip the registry push and only keep artifacts on Jenkins.
+    parameters {
+        booleanParam(name: 'PUSH_TO_DOCKERHUB', defaultValue: true,
+                      description: 'Push images to Docker Hub in addition to archiving them on Jenkins')
     }
 
     triggers {
@@ -25,105 +47,176 @@ pipeline {
             }
         }
 
+        stage('Run Tests') {
+            steps {
+                sh '''
+                    set -e
+                    cd ${APP_DIR}
+                    docker compose -f docker-compose.test.yml build
+                    docker compose -f docker-compose.test.yml run --rm auth-test
+                    docker compose -f docker-compose.test.yml run --rm product-test
+                    docker compose -f docker-compose.test.yml run --rm order-test
+                    docker compose -f docker-compose.test.yml run --rm inventory-test
+                    docker compose -f docker-compose.test.yml run --rm statistics-test
+                    docker compose -f docker-compose.test.yml run --rm gateway-test
+                '''
+            }
+            post {
+                always {
+                    sh '''
+                        cd ${APP_DIR}
+                        docker compose -f docker-compose.test.yml down --remove-orphans || true
+                    '''
+                }
+                failure {
+                    echo "Tests FAILED — Build, archive & push stages will be skipped."
+                }
+            }
+        }
 
         stage('Build Images') {
+            when { expression { return currentBuild.currentResult == 'SUCCESS' } }
             parallel {
-
-            stage('Build Backend Image') {
-                steps {
-                    sh '''
-                        docker build \
-                            -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
-                            -t ${BACKEND_IMAGE}:latest \
-                            ${APP_DIR}/Backend
-                    '''
+                stage('Build auth-service') {
+                    steps {
+                        sh 'docker build -t ${AUTH_IMAGE}:${IMAGE_TAG} -t ${AUTH_IMAGE}:latest ${APP_DIR}/Backend/auth-service'
+                    }
                 }
-            }
-
-            stage('Build Backend K8s Image') {
-                steps {
-                    sh '''
-                        docker build \
-                            -f ${APP_DIR}/Backend/Dockerfile \
-                            -t ${BACKEND_K8S_IMAGE}:${IMAGE_TAG} \
-                            -t ${BACKEND_K8S_IMAGE}:latest \
-                            ${APP_DIR}/Backend
-                    '''
+                stage('Build product-service') {
+                    steps {
+                        sh 'docker build -t ${PRODUCT_IMAGE}:${IMAGE_TAG} -t ${PRODUCT_IMAGE}:latest ${APP_DIR}/Backend/product-service'
+                    }
                 }
-            }
-
-            stage('Build Frontend Image') {
-                steps {
-                    sh '''
-                        docker build \
-                            -f ${APP_DIR}/Frontend/dockerfile.dev \
-                            -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
-                            -t ${FRONTEND_IMAGE}:latest \
-                            ${APP_DIR}/Frontend
-                    '''
+                stage('Build order-service') {
+                    steps {
+                        sh 'docker build -t ${ORDER_IMAGE}:${IMAGE_TAG} -t ${ORDER_IMAGE}:latest ${APP_DIR}/Backend/order-service'
+                    }
                 }
-            }
-
-            stage('Build Frontend K8s Image') {
-                steps {
-                    sh '''
-                        docker build \
-                            -f ${APP_DIR}/Frontend/dockerfile.k8s \
-                            -t ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG} \
-                            -t ${FRONTEND_K8S_IMAGE}:latest \
-                            ${APP_DIR}/Frontend
-                    '''
+                stage('Build inventory-service') {
+                    steps {
+                        sh 'docker build -t ${INVENTORY_IMAGE}:${IMAGE_TAG} -t ${INVENTORY_IMAGE}:latest ${APP_DIR}/Backend/inventory-service'
+                    }
+                }
+                stage('Build statistics-service') {
+                    steps {
+                        sh 'docker build -t ${STATISTICS_IMAGE}:${IMAGE_TAG} -t ${STATISTICS_IMAGE}:latest ${APP_DIR}/Backend/statistics-service'
+                    }
+                }
+                stage('Build api-gateway') {
+                    steps {
+                        sh 'docker build -t ${GATEWAY_IMAGE}:${IMAGE_TAG} -t ${GATEWAY_IMAGE}:latest ${APP_DIR}/Backend/api-gateway'
+                    }
+                }
+                stage('Build frontend') {
+                    steps {
+                        sh 'docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ${APP_DIR}/Frontend'
                     }
                 }
             }
         }
 
-        stage('Push to Docker Hub') {
+        // --- This is the stage that makes Jenkins itself "produce" the artifact ---
+        stage('Archive Build Artifacts') {
+            when { expression { return currentBuild.currentResult == 'SUCCESS' } }
             steps {
-                sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
                 sh '''
-                    docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
-                    docker push ${BACKEND_IMAGE}:latest
+                    set -e
+                    rm -rf ${ARTIFACT_DIR}
+                    mkdir -p ${ARTIFACT_DIR}
 
-                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
-                    docker push ${FRONTEND_IMAGE}:latest
+                    # 1) Frontend static bundle (the compiled React app) as a zip
+                    # Use a build-number-suffixed container name so concurrent/retried
+                    # builds never collide, and clean up any leftover from a previous
+                    # failed/aborted run just in case.
+                    EXTRACT_CONTAINER="frontend-extract-${BUILD_NUMBER}"
+                    docker rm -f "${EXTRACT_CONTAINER}" >/dev/null 2>&1 || true
+                    docker create --name "${EXTRACT_CONTAINER}" ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    docker cp "${EXTRACT_CONTAINER}:/usr/share/nginx/html" ${ARTIFACT_DIR}/frontend-dist
+                    docker rm "${EXTRACT_CONTAINER}"
+                    # Use tar (always present) instead of zip, which is often missing
+                    # on minimal Jenkins agents.
+                    (cd ${ARTIFACT_DIR} && tar czf frontend-dist-${IMAGE_TAG}.tar.gz frontend-dist && rm -rf frontend-dist)
 
-                    docker push ${BACKEND_K8S_IMAGE}:${IMAGE_TAG}
-                    docker push ${BACKEND_K8S_IMAGE}:latest
+                    # 2) Every backend image, exported as a portable .tar.gz
+                    #    (importable anywhere with `docker load -i <file>`, no registry needed)
+                    for pair in "auth:${AUTH_IMAGE}" "product:${PRODUCT_IMAGE}" "order:${ORDER_IMAGE}" \
+                                "inventory:${INVENTORY_IMAGE}" "statistics:${STATISTICS_IMAGE}" \
+                                "gateway:${GATEWAY_IMAGE}" "frontend:${FRONTEND_IMAGE}"; do
+                        name="${pair%%:*}"
+                        image="${pair#*:}"
+                        docker save "${image}:${IMAGE_TAG}" | gzip > "${ARTIFACT_DIR}/${name}-${IMAGE_TAG}.tar.gz"
+                    done
 
-                    docker push ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG}
-                    docker push ${FRONTEND_K8S_IMAGE}:latest
+                    # 3) A manifest so it's obvious what build/commit these came from
+                    {
+                        echo "build_number=${BUILD_NUMBER}"
+                        echo "git_commit=$(git rev-parse HEAD)"
+                        echo "image_tag=${IMAGE_TAG}"
+                        date -u +"built_at=%Y-%m-%dT%H:%M:%SZ"
+                    } > ${ARTIFACT_DIR}/build-manifest.txt
                 '''
+            }
+            post {
+                success {
+                    // Shows up under "Build Artifacts" on the Jenkins build page
+                    archiveArtifacts artifacts: "${ARTIFACT_DIR}/*.tar.gz,${ARTIFACT_DIR}/build-manifest.txt",
+                                      fingerprint: true
+                }
             }
         }
 
+        stage('Push to Docker Hub') {
+            when {
+                allOf {
+                    expression { return currentBuild.currentResult == 'SUCCESS' }
+                    expression { return params.PUSH_TO_DOCKERHUB }
+                }
+            }
+            steps {
+                sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
+                sh '''
+                    set -e
+                    docker push ${AUTH_IMAGE}:${IMAGE_TAG}        && docker push ${AUTH_IMAGE}:latest
+                    docker push ${PRODUCT_IMAGE}:${IMAGE_TAG}     && docker push ${PRODUCT_IMAGE}:latest
+                    docker push ${ORDER_IMAGE}:${IMAGE_TAG}       && docker push ${ORDER_IMAGE}:latest
+                    docker push ${INVENTORY_IMAGE}:${IMAGE_TAG}   && docker push ${INVENTORY_IMAGE}:latest
+                    docker push ${STATISTICS_IMAGE}:${IMAGE_TAG}  && docker push ${STATISTICS_IMAGE}:latest
+                    docker push ${GATEWAY_IMAGE}:${IMAGE_TAG}     && docker push ${GATEWAY_IMAGE}:latest
+                    docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}    && docker push ${FRONTEND_IMAGE}:latest
+                '''
+            }
+        }
     }
 
     post {
         always {
-            node('') {
-                sh 'docker logout || true'
-            }
+            sh 'docker logout || true'
         }
         success {
-            echo "Pipeline succeeded!"
-            echo "Backend image:  ${BACKEND_IMAGE}:${IMAGE_TAG}"
-            echo "Backend image:  ${BACKEND_K8S_IMAGE}:${IMAGE_TAG}"
-            echo "Frontend image: ${FRONTEND_IMAGE}:${IMAGE_TAG}"
-            echo "Frontend image: ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG}"
+            echo "Pipeline succeeded."
+            echo "Jenkins build artifacts saved under: ${ARTIFACT_DIR}/ (see 'Build Artifacts' on this build's page)"
+            echo "auth-service:        ${AUTH_IMAGE}:${IMAGE_TAG}"
+            echo "product-service:     ${PRODUCT_IMAGE}:${IMAGE_TAG}"
+            echo "order-service:       ${ORDER_IMAGE}:${IMAGE_TAG}"
+            echo "inventory-service:   ${INVENTORY_IMAGE}:${IMAGE_TAG}"
+            echo "statistics-service:  ${STATISTICS_IMAGE}:${IMAGE_TAG}"
+            echo "api-gateway:         ${GATEWAY_IMAGE}:${IMAGE_TAG}"
+            echo "frontend:            ${FRONTEND_IMAGE}:${IMAGE_TAG}"
         }
         failure {
-            echo "Pipeline failed at stage: ${env.STAGE_NAME}"
+            echo "Pipeline failed at stage: ${env.STAGE_NAME} — no images were pushed and no artifacts were archived."
         }
         cleanup {
-            node('') {
-                sh '''
-                    docker rmi ${BACKEND_IMAGE}:${IMAGE_TAG}  || true
-                    docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG} || true
-                    docker rmi ${BACKEND_K8S_IMAGE}:${IMAGE_TAG} || true
-                    docker rmi ${FRONTEND_K8S_IMAGE}:${IMAGE_TAG} || true
-                '''
-            }
+            sh '''
+                docker rmi ${AUTH_IMAGE}:${IMAGE_TAG}       || true
+                docker rmi ${PRODUCT_IMAGE}:${IMAGE_TAG}    || true
+                docker rmi ${ORDER_IMAGE}:${IMAGE_TAG}      || true
+                docker rmi ${INVENTORY_IMAGE}:${IMAGE_TAG}  || true
+                docker rmi ${STATISTICS_IMAGE}:${IMAGE_TAG} || true
+                docker rmi ${GATEWAY_IMAGE}:${IMAGE_TAG}    || true
+                docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG}   || true
+            '''
         }
     }
 }
+
