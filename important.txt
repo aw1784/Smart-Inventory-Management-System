@@ -1,2 +1,11 @@
 I renamed the Backend and Frontend directories to backend and frontend (the upper case didn't work)
 
+Local host Ports:
+Frontend: 3000
+Grafana: 3001
+cAdvisor: 5000
+Node Exporter: 5001
+Prometheus: 9090
+metrics: 4004/metrics (don't forget the directory /metrics)
+
+In grafana, add the source>> http://prometheus:9090

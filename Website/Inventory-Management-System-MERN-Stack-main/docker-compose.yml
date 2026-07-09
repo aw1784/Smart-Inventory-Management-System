@@ -136,7 +136,7 @@ services:
     depends_on:
       - api-gateway
     ports:
-      - "3000:80"
+      - "3003:80"
     networks:
       - ims-net
 
@@ -159,6 +159,8 @@ services:
       - "3001:3000"
     depends_on:
       - prometheus
+    volumes:
+      - grafana-storage:/var/lib/grafana
     networks:
       - ims-net
 
@@ -195,6 +197,7 @@ services:
 
 volumes:
   mongo-data:
+  grafana-storage:
 
 networks:
   ims-net:
