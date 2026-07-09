@@ -1,3 +1,14 @@
+// Jenkinsfile — Inventory Management System (MERN microservices)
+//
+// This pipeline does two distinct things, both of which Jenkins calls an
+// "artifact":
+//   1. Docker Hub push  — publishes each service's image to a registry
+//      (a *remote* artifact other machines can `docker pull`).
+//   2. archiveArtifacts  — saves build outputs (frontend static bundle +
+//      exported Docker image .tar files) directly onto the Jenkins build
+//      page, under "Build Artifacts", so you can download them straight
+//      from Jenkins without touching Docker Hub at all.
+//
 pipeline {
     agent any
 
@@ -10,9 +21,16 @@ pipeline {
         INVENTORY_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
         STATISTICS_IMAGE      = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
         GATEWAY_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
-        FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"      
+        FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
         IMAGE_TAG             = "${BUILD_NUMBER}"
-        APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
+        APP_DIR               = "."
+        ARTIFACT_DIR          = "jenkins-artifacts"
+    }
+
+    // Toggle this to skip the registry push and only keep artifacts on Jenkins.
+    parameters {
+        booleanParam(name: 'PUSH_TO_DOCKERHUB', defaultValue: true,
+                      description: 'Push images to Docker Hub in addition to archiving them on Jenkins')
     }
 
     triggers {
@@ -30,8 +48,6 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                // -e ensures the script aborts on the first failing test container
-                // and propagates a non-zero exit code so the stage fails.
                 sh '''
                     set -e
                     cd ${APP_DIR}
@@ -52,101 +68,101 @@ pipeline {
                     '''
                 }
                 failure {
-                    echo "Tests FAILED — Build & Push stages will be skipped."
+                    echo "Tests FAILED — Build, archive & push stages will be skipped."
                 }
             }
         }
 
         stage('Build Images') {
-            // Only run if no prior stage (i.e. tests) failed
-            when {
-                expression { return currentBuild.currentResult == 'SUCCESS' }
-            }
+            when { expression { return currentBuild.currentResult == 'SUCCESS' } }
             parallel {
-
                 stage('Build auth-service') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${AUTH_IMAGE}:${IMAGE_TAG} \
-                                -t ${AUTH_IMAGE}:latest \
-                                ${APP_DIR}/Backend/auth-service
-                        '''
+                        sh 'docker build -t ${AUTH_IMAGE}:${IMAGE_TAG} -t ${AUTH_IMAGE}:latest ${APP_DIR}/Backend/auth-service'
                     }
                 }
-
                 stage('Build product-service') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${PRODUCT_IMAGE}:${IMAGE_TAG} \
-                                -t ${PRODUCT_IMAGE}:latest \
-                                ${APP_DIR}/Backend/product-service
-                        '''
+                        sh 'docker build -t ${PRODUCT_IMAGE}:${IMAGE_TAG} -t ${PRODUCT_IMAGE}:latest ${APP_DIR}/Backend/product-service'
                     }
                 }
-
                 stage('Build order-service') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${ORDER_IMAGE}:${IMAGE_TAG} \
-                                -t ${ORDER_IMAGE}:latest \
-                                ${APP_DIR}/Backend/order-service
-                        '''
+                        sh 'docker build -t ${ORDER_IMAGE}:${IMAGE_TAG} -t ${ORDER_IMAGE}:latest ${APP_DIR}/Backend/order-service'
                     }
                 }
-
                 stage('Build inventory-service') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${INVENTORY_IMAGE}:${IMAGE_TAG} \
-                                -t ${INVENTORY_IMAGE}:latest \
-                                ${APP_DIR}/Backend/inventory-service
-                        '''
+                        sh 'docker build -t ${INVENTORY_IMAGE}:${IMAGE_TAG} -t ${INVENTORY_IMAGE}:latest ${APP_DIR}/Backend/inventory-service'
                     }
                 }
-
                 stage('Build statistics-service') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${STATISTICS_IMAGE}:${IMAGE_TAG} \
-                                -t ${STATISTICS_IMAGE}:latest \
-                                ${APP_DIR}/Backend/statistics-service
-                        '''
+                        sh 'docker build -t ${STATISTICS_IMAGE}:${IMAGE_TAG} -t ${STATISTICS_IMAGE}:latest ${APP_DIR}/Backend/statistics-service'
                     }
                 }
-
                 stage('Build api-gateway') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${GATEWAY_IMAGE}:${IMAGE_TAG} \
-                                -t ${GATEWAY_IMAGE}:latest \
-                                ${APP_DIR}/Backend/api-gateway
-                        '''
+                        sh 'docker build -t ${GATEWAY_IMAGE}:${IMAGE_TAG} -t ${GATEWAY_IMAGE}:latest ${APP_DIR}/Backend/api-gateway'
                     }
                 }
-
                 stage('Build frontend') {
                     steps {
-                        sh '''
-                            docker build \
-                                -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
-                                -t ${FRONTEND_IMAGE}:latest \
-                                ${APP_DIR}/Frontend
-                        '''
+                        sh 'docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ${APP_DIR}/Frontend'
                     }
                 }
             }
         }
 
+        // --- This is the stage that makes Jenkins itself "produce" the artifact ---
+        stage('Archive Build Artifacts') {
+            when { expression { return currentBuild.currentResult == 'SUCCESS' } }
+            steps {
+                sh '''
+                    set -e
+                    rm -rf ${ARTIFACT_DIR}
+                    mkdir -p ${ARTIFACT_DIR}
+
+                    # 1) Frontend static bundle (the compiled React app) as a zip
+                    docker create --name frontend-extract ${FRONTEND_IMAGE}:${IMAGE_TAG}
+                    docker cp frontend-extract:/usr/share/nginx/html ${ARTIFACT_DIR}/frontend-dist
+                    docker rm frontend-extract
+                    (cd ${ARTIFACT_DIR} && zip -r frontend-dist-${IMAGE_TAG}.zip frontend-dist && rm -rf frontend-dist)
+
+                    # 2) Every backend image, exported as a portable .tar.gz
+                    #    (importable anywhere with `docker load -i <file>`, no registry needed)
+                    for pair in "auth:${AUTH_IMAGE}" "product:${PRODUCT_IMAGE}" "order:${ORDER_IMAGE}" \
+                                "inventory:${INVENTORY_IMAGE}" "statistics:${STATISTICS_IMAGE}" \
+                                "gateway:${GATEWAY_IMAGE}" "frontend:${FRONTEND_IMAGE}"; do
+                        name="${pair%%:*}"
+                        image="${pair#*:}"
+                        docker save "${image}:${IMAGE_TAG}" | gzip > "${ARTIFACT_DIR}/${name}-${IMAGE_TAG}.tar.gz"
+                    done
+
+                    # 3) A manifest so it's obvious what build/commit these came from
+                    {
+                        echo "build_number=${BUILD_NUMBER}"
+                        echo "git_commit=$(git rev-parse HEAD)"
+                        echo "image_tag=${IMAGE_TAG}"
+                        date -u +"built_at=%Y-%m-%dT%H:%M:%SZ"
+                    } > ${ARTIFACT_DIR}/build-manifest.txt
+                '''
+            }
+            post {
+                success {
+                    // Shows up under "Build Artifacts" on the Jenkins build page
+                    archiveArtifacts artifacts: "${ARTIFACT_DIR}/*.zip,${ARTIFACT_DIR}/*.tar.gz,${ARTIFACT_DIR}/build-manifest.txt",
+                                      fingerprint: true
+                }
+            }
+        }
+
         stage('Push to Docker Hub') {
-            // Skip push entirely if tests failed OR if any image build failed
             when {
-                expression { return currentBuild.currentResult == 'SUCCESS' }
+                allOf {
+                    expression { return currentBuild.currentResult == 'SUCCESS' }
+                    expression { return params.PUSH_TO_DOCKERHUB }
+                }
             }
             steps {
                 sh 'echo ${DOCKERHUB_CREDENTIALS_PSW} | docker login -u ${DOCKERHUB_CREDENTIALS_USR} --password-stdin'
@@ -166,12 +182,11 @@ pipeline {
 
     post {
         always {
-            node('') {
-                sh 'docker logout || true'
-            }
+            sh 'docker logout || true'
         }
         success {
-            echo "Pipeline succeeded — images pushed:"
+            echo "Pipeline succeeded."
+            echo "Jenkins build artifacts saved under: ${ARTIFACT_DIR}/ (see 'Build Artifacts' on this build's page)"
             echo "auth-service:        ${AUTH_IMAGE}:${IMAGE_TAG}"
             echo "product-service:     ${PRODUCT_IMAGE}:${IMAGE_TAG}"
             echo "order-service:       ${ORDER_IMAGE}:${IMAGE_TAG}"
@@ -181,20 +196,18 @@ pipeline {
             echo "frontend:            ${FRONTEND_IMAGE}:${IMAGE_TAG}"
         }
         failure {
-            echo "Pipeline failed at stage: ${env.STAGE_NAME} — NO images were pushed to Docker Hub."
+            echo "Pipeline failed at stage: ${env.STAGE_NAME} — no images were pushed and no artifacts were archived."
         }
         cleanup {
-            node('') {
-                sh '''
-                    docker rmi ${AUTH_IMAGE}:${IMAGE_TAG}       || true
-                    docker rmi ${PRODUCT_IMAGE}:${IMAGE_TAG}    || true
-                    docker rmi ${ORDER_IMAGE}:${IMAGE_TAG}      || true
-                    docker rmi ${INVENTORY_IMAGE}:${IMAGE_TAG}  || true
-                    docker rmi ${STATISTICS_IMAGE}:${IMAGE_TAG} || true
-                    docker rmi ${GATEWAY_IMAGE}:${IMAGE_TAG}    || true
-                    docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG}   || true
-                '''
-            }
+            sh '''
+                docker rmi ${AUTH_IMAGE}:${IMAGE_TAG}       || true
+                docker rmi ${PRODUCT_IMAGE}:${IMAGE_TAG}    || true
+                docker rmi ${ORDER_IMAGE}:${IMAGE_TAG}      || true
+                docker rmi ${INVENTORY_IMAGE}:${IMAGE_TAG}  || true
+                docker rmi ${STATISTICS_IMAGE}:${IMAGE_TAG} || true
+                docker rmi ${GATEWAY_IMAGE}:${IMAGE_TAG}    || true
+                docker rmi ${FRONTEND_IMAGE}:${IMAGE_TAG}   || true
+            '''
         }
     }
 }
