@@ -1,0 +1,3 @@
+Divide the backend and frontend into microservers and dockerize it again.
+Add test cases (should be found with the source codes) and add the testing to Jenkins Pipeline.
+Discuss the ability of having a build artifactory, so it is a real pipeline and CI not just GitOps.

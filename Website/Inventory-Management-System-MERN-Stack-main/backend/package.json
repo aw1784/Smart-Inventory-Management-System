@@ -1,0 +1,14 @@
+{
+  "name": "inventory-management-backend",
+  "version": "1.0.0",
+  "description": "Backend microservices entry point",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix auth-service install && npm --prefix product-service install && npm --prefix order-service install && npm --prefix inventory-service install && npm --prefix statistics-service install && npm --prefix api-gateway install",
+    "start": "concurrently -n gateway,auth,product,order,inventory,statistics -c blue,green,magenta,cyan,yellow,white \"npm --prefix api-gateway start\" \"npm --prefix auth-service start\" \"npm --prefix product-service start\" \"npm --prefix order-service start\" \"npm --prefix inventory-service start\" \"npm --prefix statistics-service start\"",
+    "test": "npm --prefix auth-service test && npm --prefix product-service test && npm --prefix order-service test && npm --prefix inventory-service test && npm --prefix statistics-service test && npm --prefix api-gateway test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
