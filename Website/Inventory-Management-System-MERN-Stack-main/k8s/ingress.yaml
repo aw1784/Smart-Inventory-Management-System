@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ims-ingress
+  namespace: ims
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ims.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ims-backend-service
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ims-frontend-service
+                port:
+                  number: 80

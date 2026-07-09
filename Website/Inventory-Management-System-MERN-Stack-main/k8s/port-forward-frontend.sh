@@ -1,0 +1,1 @@
+kubectl port-forward svc/ims-frontend-service 5000:80 -n ims
