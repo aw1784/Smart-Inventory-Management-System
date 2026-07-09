@@ -1,0 +1,104 @@
+---
+- name: Create prometheus system group
+  group:
+    name: prometheus
+    system: yes
+    state: present
+
+- name: Create prometheus system user
+  user:
+    name: prometheus
+    group: prometheus
+    system: yes
+    shell: /sbin/nologin
+    create_home: no
+    state: present
+
+- name: Create necessary directories for Prometheus
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Download Prometheus binary release
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz"
+    dest: /tmp/prometheus.tar.gz
+
+- name: Extract Prometheus archive
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp
+    remote_src: yes
+
+- name: Copy binaries to /usr/local/bin
+  copy:
+    src: "/tmp/prometheus-2.45.0.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    remote_src: yes
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+  loop:
+    - prometheus
+    - promtool
+
+- name: Copy configuration helper folders
+  copy:
+    src: "/tmp/prometheus-2.45.0.linux-amd64/{{ item }}"
+    dest: /etc/prometheus/
+    remote_src: yes
+    owner: prometheus
+    group: prometheus
+  loop:
+    - consoles
+    - console_libraries
+
+- name: Generate base Prometheus configuration file
+  copy:
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+    content: |
+      global:
+        scrape_interval: 15s
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['localhost:9090']
+
+- name: Create Systemd service definition for Prometheus
+  copy:
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Prometheus
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus/ \
+        --web.console.templates=/etc/prometheus/consoles \
+        --web.console.libraries=/etc/prometheus/console_libraries
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Reload systemd daemon and start Prometheus
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes

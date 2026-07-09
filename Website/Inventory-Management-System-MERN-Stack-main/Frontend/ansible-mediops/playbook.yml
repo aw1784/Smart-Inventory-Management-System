@@ -1,0 +1,10 @@
+---
+- name: Deploy DevOps Stack (Docker, K8s, Prometheus, Grafana, Jenkins)
+  hosts: ec2_instances
+  become: yes
+  roles:
+    - docker
+    - kubernetes
+    - prometheus
+    - grafana
+    - jenkins
