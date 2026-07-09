@@ -27,7 +27,7 @@ pipeline {
         FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
         IMAGE_TAG             = "${BUILD_NUMBER}"
         APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
-        ARTIFACT_DIR          = "jenkins-artifacts"
+        ARTIFACT_DIR          = "Website/jenkins-artifacts"
     }
 
     // Toggle this to skip the registry push and only keep artifacts on Jenkins.
@@ -135,7 +135,9 @@ pipeline {
                     docker create --name "${EXTRACT_CONTAINER}" ${FRONTEND_IMAGE}:${IMAGE_TAG}
                     docker cp "${EXTRACT_CONTAINER}:/usr/share/nginx/html" ${ARTIFACT_DIR}/frontend-dist
                     docker rm "${EXTRACT_CONTAINER}"
-                    (cd ${ARTIFACT_DIR} && zip -r frontend-dist-${IMAGE_TAG}.zip frontend-dist && rm -rf frontend-dist)
+                    # Use tar (always present) instead of zip, which is often missing
+                    # on minimal Jenkins agents.
+                    (cd ${ARTIFACT_DIR} && tar czf frontend-dist-${IMAGE_TAG}.tar.gz frontend-dist && rm -rf frontend-dist)
 
                     # 2) Every backend image, exported as a portable .tar.gz
                     #    (importable anywhere with `docker load -i <file>`, no registry needed)
@@ -159,7 +161,7 @@ pipeline {
             post {
                 success {
                     // Shows up under "Build Artifacts" on the Jenkins build page
-                    archiveArtifacts artifacts: "${ARTIFACT_DIR}/*.zip,${ARTIFACT_DIR}/*.tar.gz,${ARTIFACT_DIR}/build-manifest.txt",
+                    archiveArtifacts artifacts: "${ARTIFACT_DIR}/*.tar.gz,${ARTIFACT_DIR}/build-manifest.txt",
                                       fingerprint: true
                 }
             }
