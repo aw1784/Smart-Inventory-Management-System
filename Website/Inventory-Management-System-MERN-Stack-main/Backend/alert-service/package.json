@@ -1,7 +1,7 @@
 {
-  "name": "inventory-service",
+  "name": "alert-service",
   "version": "1.0.0",
-  "description": "Inventory management microservice",
+  "description": "Email alert microservice",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,14 +9,13 @@
     "test": "jest --runInBand --detectOpenHandles"
   },
   "dependencies": {
-    "axios": "^1.7.2",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "mongoose": "^8.5.0"
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "mongodb-memory-server": "^9.4.0",
     "nodemon": "^3.1.4",
     "supertest": "^7.0.0"
   },

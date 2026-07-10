@@ -26,6 +26,14 @@ spec:
               value: "4004"
             - name: INVENTORY_MONGO_URI
               value: "mongodb://mongo:27017/inventory_stock"
+            - name: ALERT_SERVICE_URL
+              value: "http://alert-service:4006/api/alerts/send"
+            - name: ALERT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: ims-secrets
+                  key: ALERT_EMAIL
+
 ---
 apiVersion: v1
 kind: Service
