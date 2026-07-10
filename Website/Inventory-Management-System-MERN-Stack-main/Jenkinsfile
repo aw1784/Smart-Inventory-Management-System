@@ -8,9 +8,7 @@
 //      exported Docker image .tar files) directly onto the Jenkins build
 //      page, under "Build Artifacts", so you can download them straight
 //      from Jenkins without touching Docker Hub at all.
-//
-// Run this on a real Jenkins controller with Docker installed on the agent
-// (Replit does not run Jenkins itself — see docs/jenkins/README.md).
+
 
 pipeline {
     agent any
@@ -221,3 +219,4 @@ pipeline {
         }
     }
 }
+

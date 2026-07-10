@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ims-backend
+  namespace: ims
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ims-backend
+  template:
+    metadata:
+      labels:
+        app: ims-backend
+    spec:
+      containers:
+        - name: ims-backend
+          image: ahmedwalid1410/ims-backend-k8s:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: ims-backend-config
+            - secretRef:
+                name: ims-backend-secret
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
