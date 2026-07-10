@@ -22,6 +22,7 @@ pipeline {
         INVENTORY_IMAGE       = "${DOCKERHUB_CREDENTIALS_USR}/ims-inventory-service"
         STATISTICS_IMAGE      = "${DOCKERHUB_CREDENTIALS_USR}/ims-statistics-service"
         GATEWAY_IMAGE         = "${DOCKERHUB_CREDENTIALS_USR}/ims-api-gateway"
+        ALERT_IMAGE           = "${DOCKERHUB_CREDENTIALS_USR}/ims-alert-service"
         FRONTEND_IMAGE        = "${DOCKERHUB_CREDENTIALS_USR}/ims-frontend"
         IMAGE_TAG             = "${BUILD_NUMBER}"
         APP_DIR               = "Website/Inventory-Management-System-MERN-Stack-main"
@@ -107,6 +108,11 @@ pipeline {
                         sh 'docker build -t ${GATEWAY_IMAGE}:${IMAGE_TAG} -t ${GATEWAY_IMAGE}:latest ${APP_DIR}/Backend/api-gateway'
                     }
                 }
+                stage('Build alert-service') {
+                    steps {
+                        sh 'docker build -t ${ALERT_IMAGE}:${IMAGE_TAG} -t ${ALERT_IMAGE}:latest ${APP_DIR}/Backend/alert-service'
+                    }
+                }                
                 stage('Build frontend') {
                     steps {
                         sh 'docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ${APP_DIR}/Frontend'
@@ -141,7 +147,7 @@ pipeline {
                     #    (importable anywhere with `docker load -i <file>`, no registry needed)
                     for pair in "auth:${AUTH_IMAGE}" "product:${PRODUCT_IMAGE}" "order:${ORDER_IMAGE}" \
                                 "inventory:${INVENTORY_IMAGE}" "statistics:${STATISTICS_IMAGE}" \
-                                "gateway:${GATEWAY_IMAGE}" "frontend:${FRONTEND_IMAGE}"; do
+                                "gateway:${GATEWAY_IMAGE}" "alert:${ALERT_IMAGE}" "frontend:${FRONTEND_IMAGE}"; do
                         name="${pair%%:*}"
                         image="${pair#*:}"
                         docker save "${image}:${IMAGE_TAG}" | gzip > "${ARTIFACT_DIR}/${name}-${IMAGE_TAG}.tar.gz"
@@ -182,6 +188,7 @@ pipeline {
                     docker push ${INVENTORY_IMAGE}:${IMAGE_TAG}   && docker push ${INVENTORY_IMAGE}:latest
                     docker push ${STATISTICS_IMAGE}:${IMAGE_TAG}  && docker push ${STATISTICS_IMAGE}:latest
                     docker push ${GATEWAY_IMAGE}:${IMAGE_TAG}     && docker push ${GATEWAY_IMAGE}:latest
+                    docker push ${ALERT_IMAGE}:${IMAGE_TAG}       && docker push ${ALERT_IMAGE}:latest
                     docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}    && docker push ${FRONTEND_IMAGE}:latest
                 '''
             }
