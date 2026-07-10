@@ -142,6 +142,9 @@ services:
 
 volumes:
   mongo-data:
+#if i want to use the data in mongo volume in another container, I can mount the same volume in that container's configuration. For example, if I have another service that needs access to the MongoDB data, I can add the following to its configuration:
+#     external: true
+#     name: inventory-management-mern_mongo-data
 
 networks:
   ims-net:
