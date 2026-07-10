@@ -1,1 +1,0 @@
-kubectl port-forward svc/ims-backend-service 3000:3000 -n ims
