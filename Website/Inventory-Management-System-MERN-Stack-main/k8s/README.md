@@ -228,6 +228,12 @@ kubectl -n inventory-management exec -it deploy/mongo -- mongosh
 
 # Delete the whole stack
 kubectl delete namespace inventory-management
+
+# Install Ingress-NGINX controller
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+# Delete Ingress-NGINX controller
+kubectl delete -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
 ```
 
 ---

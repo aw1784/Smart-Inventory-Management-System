@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: alert-service
-          image: yourdockerhubusername/ims-alert-service:latest
+          image: ahmedwalid1410/ims-alert-service:latest
           imagePullPolicy: IfNotPresent
 
           ports:

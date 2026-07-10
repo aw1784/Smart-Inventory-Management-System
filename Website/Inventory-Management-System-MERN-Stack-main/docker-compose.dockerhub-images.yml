@@ -115,6 +115,23 @@ services:
     networks:
       - ims-net
 
+  alert-service:
+    image: ahmedwalid1410/ims-alert-service:latest
+    container_name: ims-alert
+    restart: unless-stopped
+    environment:
+      ALERT_SERVICE_PORT: 4006
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      ALERT_EMAIL: ${ALERT_EMAIL}
+    depends_on:
+    - mongo
+
+    ports:
+      - "4006:4006"
+    networks:
+      - ims-net
+
   frontend:
     image: ahmedwalid1410/ims-frontend:latest
     container_name: ims-frontend
