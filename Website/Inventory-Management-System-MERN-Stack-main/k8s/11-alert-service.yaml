@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-service
+  namespace: inventory-management
+  labels:
+    app: alert-service
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: alert-service
+
+  template:
+    metadata:
+      labels:
+        app: alert-service
+
+    spec:
+      containers:
+        - name: alert-service
+          image: yourdockerhubusername/ims-alert-service:latest
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - containerPort: 4006
+
+          env:
+            - name: ALERT_SERVICE_PORT
+              value: "4006"
+
+            - name: EMAIL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: ims-secrets
+                  key: EMAIL_USER
+
+            - name: EMAIL_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: ims-secrets
+                  key: EMAIL_PASS
+
+            - name: ALERT_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: ims-secrets
+                  key: ALERT_EMAIL
+
+---
+
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: alert-service
+  namespace: inventory-management
+
+spec:
+  selector:
+    app: alert-service
+
+  ports:
+    - port: 4006
+      targetPort: 4006
+
+  type: ClusterIP

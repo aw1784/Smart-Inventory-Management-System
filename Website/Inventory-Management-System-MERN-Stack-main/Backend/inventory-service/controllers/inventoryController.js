@@ -1,8 +1,37 @@
 const Inventory = require('../models/inventoryModel');
+const { sendLowStockAlert } = require('../services/alertService');
+
+const checkLowStockAlert = async (item) => {
+  // المنتج دخل منطقة الـ Low Stock لأول مرة
+  if (
+    item.quantity <= item.lowStockThreshold &&
+    !item.lowStockAlertSent
+  ) {
+    await sendLowStockAlert(item);
+
+    item.lowStockAlertSent = true;
+    await item.save();
+
+    return;
+  }
+
+  // المنتج رجع فوق الـ Threshold
+  // اعمل Reset عشان لو نزل مرة تانية يبعت Email جديد
+  if (
+    item.quantity > item.lowStockThreshold &&
+    item.lowStockAlertSent
+  ) {
+    item.lowStockAlertSent = false;
+    await item.save();
+  }
+};
 
 exports.addInventory = async (req, res) => {
   try {
     const item = await Inventory.create(req.body);
+
+    await checkLowStockAlert(item);
+
     return res.status(201).json({ item });
   } catch (err) {
     return res.status(400).json({ message: 'Failed to add inventory', error: err.message });
@@ -35,6 +64,9 @@ exports.updateInventory = async (req, res) => {
       runValidators: true,
     });
     if (!item) return res.status(404).json({ message: 'Inventory record not found' });
+
+    await checkLowStockAlert(item);
+
     return res.status(200).json({ item });
   } catch (err) {
     return res.status(400).json({ message: 'Failed to update inventory', error: err.message });
@@ -53,6 +85,9 @@ exports.adjustQuantity = async (req, res) => {
     if (newQty < 0) return res.status(400).json({ message: 'Insufficient stock' });
     item.quantity = newQty;
     await item.save();
+
+    await checkLowStockAlert(item);
+
     return res.status(200).json({ item });
   } catch (err) {
     return res.status(400).json({ message: 'Failed to adjust inventory', error: err.message });
@@ -73,6 +108,9 @@ exports.adjustByProduct = async (req, res) => {
     }
     item.quantity = newQty;
     await item.save();
+
+    await checkLowStockAlert(item);
+    
     return res.status(200).json({ item });
   } catch (err) {
     return res.status(400).json({ message: 'Failed to adjust inventory', error: err.message });
